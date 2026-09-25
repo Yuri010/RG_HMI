@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Roboguide Material Handling Cell</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">FANUC Roboguide</p>
+          <h1>Cell_New Material Handling</h1>
+        </div>
+        <button id="themeToggle" class="theme-toggle" aria-label="Toggle dark mode">
+          <span class="icon">☀️</span>
+          <span class="label">Light</span>
+        </button>
+      </header>
+
+      <section class="status-strip">
+        <div class="status-pill">
+          <span class="tag">Robot</span>
+          <strong id="robotStatusText">Idle</strong>
+        </div>
+        <div class="status-pill warning">
+          <span class="tag">Message</span>
+          <strong id="statusMessage">Waiting for operator input</strong>
+        </div>
+      </section>
+
+      <main class="layout">
+        <section class="panel table-panel">
+          <div class="panel-header">
+            <h2>Pallet overview</h2>
+            <div class="legend">
+              <span class="dot rack"></span> Rack
+              <span class="dot machine"></span> Machine
+              <span class="dot clock"></span> Clock station
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Status</th>
+                <th>Location</th>
+                <th>Palletnr</th>
+              </tr>
+            </thead>
+            <tbody id="palletTableBody"></tbody>
+          </table>
+        </section>
+
+        <aside class="panel controls-panel">
+          <div class="summary-grid">
+            <div class="summary-card">
+              <span class="label">Machine</span>
+              <strong id="machineSummary">Empty</strong>
+            </div>
+            <div class="summary-card">
+              <span class="label">Clock station</span>
+              <strong id="clockSummary">Available</strong>
+            </div>
+            <div class="summary-card">
+              <span class="label">Hand</span>
+              <strong id="handSummary">Empty</strong>
+            </div>
+            <div class="summary-card selected-card">
+              <span class="label">Selection</span>
+              <strong id="selectedSummary">No pallet</strong>
+            </div>
+          </div>
+
+          <div class="action-stack">
+            <button id="moveToMachineBtn" class="primary action-btn" type="button">
+              Queue pallet to machine
+            </button>
+            <button id="moveToRackBtn" class="secondary action-btn" type="button">
+              Queue pallet to rack
+            </button>
+              <button id="refreshQueueBtn" class="ghost action-btn" type="button">
+                Refresh controller queue
+            </button>
+          </div>
+
+          <div class="queue-box">
+            <div class="queue-header">
+              <h3>Queued work</h3>
+              <span id="queueCount" class="queue-count">0 / 3</span>
+            </div>
+            <p id="queueEmptyState" class="queue-empty">No queued operations.</p>
+            <div id="queueList" class="queue-list" aria-live="polite"></div>
+          </div>
+        </aside>
+      </main>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>

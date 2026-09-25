@@ -1,0 +1,213 @@
+PROGRAM multitsk
+%COMMENT = 'Manages multitasking queue'
+%NOBUSYLAMP
+%NOLOCKGROUP
+%STACKSIZE = 20000
+
+VAR
+    queue_prog : ARRAY[3] OF INTEGER
+    queue_plt  : ARRAY[3] OF INTEGER
+    queue_len  : INTEGER
+    i          : INTEGER
+    task_prog  : INTEGER
+    task_plt   : INTEGER
+    status     : INTEGER
+    prog_name  : STRING[12]
+    uo_state   : INTEGER
+    entry      : INTEGER
+    pending    : INTEGER
+    slot_prog  : ARRAY[3] OF INTEGER
+    slot_plt   : ARRAY[3] OF INTEGER
+    state      : INTEGER
+    error_code : INTEGER
+    read_stat  : INTEGER
+    reg_real   : BOOLEAN
+    reg_int    : INTEGER
+    reg_value  : REAL
+
+ROUTINE enqueue_task(p_prog, p_plt : INTEGER)
+BEGIN
+    IF queue_len < 3 THEN
+        queue_len = queue_len + 1
+        queue_prog[queue_len] = p_prog
+        queue_plt[queue_len] = p_plt
+    ENDIF
+END enqueue_task
+
+ROUTINE dequeue_task(p_prog, p_plt : INTEGER)
+VAR
+    j : INTEGER
+BEGIN
+    p_prog = queue_prog[1]
+    p_plt = queue_plt[1]
+
+    FOR j = 1 TO (queue_len - 1) DO
+        queue_prog[j] = queue_prog[j + 1]
+        queue_plt[j] = queue_plt[j + 1]
+    ENDFOR
+
+    queue_prog[queue_len] = 0
+    queue_plt[queue_len] = 0
+    queue_len = queue_len - 1
+END dequeue_task
+
+ROUTINE wait_idle
+BEGIN
+    uo_state = 0
+    GET_VAR(entry, '*SYSTEM*', '$UO[3]', uo_state, status)
+    WHILE (status = 0) AND (uo_state = 1) DO
+        DELAY 250
+        GET_VAR(entry, '*SYSTEM*', '$UO[3]', uo_state, status)
+    ENDWHILE
+END wait_idle
+
+ROUTINE pub_queue
+BEGIN
+    SET_INT_REG(119, queue_len, status)
+    SET_INT_REG(120, queue_prog[1], status)
+    SET_INT_REG(121, queue_prog[2], status)
+    SET_INT_REG(122, queue_prog[3], status)
+    SET_INT_REG(123, queue_plt[1], status)
+    SET_INT_REG(124, queue_plt[2], status)
+    SET_INT_REG(125, queue_plt[3], status)
+END pub_queue
+
+ROUTINE run_next_job(p_prog, p_plt : INTEGER)
+BEGIN
+    SET_INT_REG(1, p_plt, status)
+    error_code = status
+    SET_VAR(entry, '*SYSTEM*', '$R[118]', error_code, status)
+
+    IF p_prog = 1 THEN
+        prog_name = 'STEL_PAK'
+        CALL_PROG(prog_name, status)
+        error_code = status
+        SET_VAR(entry, '*SYSTEM*', '$R[118]', error_code, status)
+        wait_idle
+        prog_name = 'MC_LEG'
+    ELSE
+        prog_name = 'MC_PAK'
+        CALL_PROG(prog_name, status)
+        error_code = status
+        SET_VAR(entry, '*SYSTEM*', '$R[118]', error_code, status)
+        wait_idle
+        prog_name = 'STEL_LEG'
+    ENDIF
+    CALL_PROG(prog_name, status)
+    error_code = status
+    SET_VAR(entry, '*SYSTEM*', '$R[118]', error_code, status)
+    wait_idle
+END run_next_job
+
+ROUTINE import_queue
+BEGIN
+    pending = 0
+    GET_REG(110, reg_real, reg_int, reg_value, read_stat)
+    IF reg_real THEN
+        pending = TRUNC(reg_value)
+    ELSE
+        pending = reg_int
+    ENDIF
+    reg_value = read_stat
+    SET_INT_REG(118, read_stat, status)
+    IF read_stat = 0 THEN
+        IF (pending > 0) AND (pending <= 3) AND ((queue_len + pending) <= 3) THEN
+        GET_REG(111, reg_real, reg_int, reg_value, status)
+        IF reg_real THEN
+            slot_prog[1] = TRUNC(reg_value)
+        ELSE
+            slot_prog[1] = reg_int
+        ENDIF
+        GET_REG(112, reg_real, reg_int, reg_value, status)
+        IF reg_real THEN
+            slot_prog[2] = TRUNC(reg_value)
+        ELSE
+            slot_prog[2] = reg_int
+        ENDIF
+        GET_REG(113, reg_real, reg_int, reg_value, status)
+        IF reg_real THEN
+            slot_prog[3] = TRUNC(reg_value)
+        ELSE
+            slot_prog[3] = reg_int
+        ENDIF
+        GET_REG(114, reg_real, reg_int, reg_value, status)
+        IF reg_real THEN
+            slot_plt[1] = TRUNC(reg_value)
+        ELSE
+            slot_plt[1] = reg_int
+        ENDIF
+        GET_REG(115, reg_real, reg_int, reg_value, status)
+        IF reg_real THEN
+            slot_plt[2] = TRUNC(reg_value)
+        ELSE
+            slot_plt[2] = reg_int
+        ENDIF
+        GET_REG(116, reg_real, reg_int, reg_value, status)
+        IF reg_real THEN
+            slot_plt[3] = TRUNC(reg_value)
+        ELSE
+            slot_plt[3] = reg_int
+        ENDIF
+        error_code = status
+        SET_VAR(entry, '*SYSTEM*', '$R[118]', error_code, status)
+
+        IF pending >= 1 THEN
+            enqueue_task(slot_prog[1], slot_plt[1])
+        ENDIF
+        IF pending >= 2 THEN
+            enqueue_task(slot_prog[2], slot_plt[2])
+        ENDIF
+        IF pending >= 3 THEN
+            enqueue_task(slot_prog[3], slot_plt[3])
+        ENDIF
+        pub_queue
+        SET_INT_REG(110, 0, status)
+        SET_INT_REG(117, 1, status)
+        ENDIF
+    ENDIF
+END import_queue
+
+BEGIN
+    entry = 0
+    status = 0
+    queue_len = 0
+    pending = 0
+    uo_state = 0
+    task_prog = 0
+    task_plt = 0
+
+    FOR i = 1 TO 3 DO
+        queue_prog[i] = 0
+        queue_plt[i] = 0
+        slot_prog[i] = 0
+        slot_plt[i] = 0
+    ENDFOR
+    prog_name = ''
+    state = 0
+    error_code = 0
+
+    SET_INT_REG(110, 0, status)
+    SET_INT_REG(117, 0, status)
+    SET_INT_REG(118, 0, status)
+    pub_queue
+
+    WHILE TRUE DO
+        import_queue
+        IF queue_len > 0 THEN
+            SET_INT_REG(117, 1, status)
+            GET_VAR(entry, '*SYSTEM*', '$UO[3]', uo_state, status)
+            IF uo_state = 0 THEN
+                dequeue_task(task_prog, task_plt)
+                pub_queue
+                run_next_job(task_prog, task_plt)
+                IF queue_len = 0 THEN
+                    SET_INT_REG(117, 2, status)
+                ENDIF
+            ELSE
+                DELAY 250
+            ENDIF
+        ELSE
+            DELAY 250
+        ENDIF
+    ENDWHILE
+END multitsk
